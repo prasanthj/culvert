@@ -1,0 +1,45 @@
+create table if not exists culvert (
+user_id string,
+page_id string,
+ad_id string,
+ad_type string,
+event_type string,
+event_time string,
+ip_address string)
+partitioned by (year int, month int)
+clustered by (user_id)
+into 32 buckets
+stored as orc
+tblproperties("transactional"="true");
+
+BASELINE
+--------
+Stream [click-stream-4] committed 1 transactions [rows: 10000, currTxnId: 3547, currWriteId: 12]..
+Stream [click-stream-3] committed 1 transactions [rows: 10000, currTxnId: 3567, currWriteId: 22]..
+Stream [click-stream-2] committed 1 transactions [rows: 10000, currTxnId: 3537, currWriteId: 32]..
+Stream [click-stream-3] committed 2 transactions [rows: 20000, currTxnId: 3568, currWriteId: 23]..
+Stream [click-stream-4] committed 2 transactions [rows: 20000, currTxnId: 3548, currWriteId: 13]..
+Stream [click-stream-3] committed 3 transactions [rows: 30000, currTxnId: 3569, currWriteId: 24]..
+Stream [click-stream-4] committed 3 transactions [rows: 30000, currTxnId: 3549, currWriteId: 14]..
+Stream [click-stream-2] committed 2 transactions [rows: 20000, currTxnId: 3538, currWriteId: 33]..
+Stream [click-stream-3] committed 4 transactions [rows: 40000, currTxnId: 3570, currWriteId: 25]..
+Stream [click-stream-4] committed 4 transactions [rows: 40000, currTxnId: 3550, currWriteId: 15]..
+Stream [click-stream-4] committed 5 transactions [rows: 50000, currTxnId: 3551, currWriteId: 16]..
+Stream [click-stream-3] committed 5 transactions [rows: 50000, currTxnId: 3571, currWriteId: 26]..
+Stream [click-stream-2] committed 3 transactions [rows: 30000, currTxnId: 3539, currWriteId: 34]..
+Stream [click-stream-3] committed 6 transactions [rows: 60000, currTxnId: 3572, currWriteId: 27]..
+Stream [click-stream-4] committed 6 transactions [rows: 60000, currTxnId: 3552, currWriteId: 17]..
+Stream [click-stream-4] committed 7 transactions [rows: 70000, currTxnId: 3553, currWriteId: 18]..
+Stream [click-stream-3] committed 7 transactions [rows: 70000, currTxnId: 3573, currWriteId: 28]..
+Stream [click-stream-2] committed 4 transactions [rows: 40000, currTxnId: 3540, currWriteId: 35]..
+Stream [click-stream-4] committed 8 transactions [rows: 80000, currTxnId: 3554, currWriteId: 19]..
+Stream [click-stream-3] committed 8 transactions [rows: 80000, currTxnId: 3574, currWriteId: 29]..
+Timeout 120000ms expired. Shutting down streams..
+Closed [click-stream-1]. Rows committed: 0
+Closed [click-stream-2]. Rows committed: 40000
+Closed [click-stream-3]. Rows committed: 80000
+Closed [click-stream-4]. Rows committed: 80000
+
+real	2m8.608s
+user	0m41.918s
+sys	0m13.607s
