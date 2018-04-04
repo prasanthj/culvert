@@ -23,7 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hive.hcatalog.streaming.HiveEndPoint;
+import org.apache.hive.streaming.HiveEndPoint;
 
 /**
  *

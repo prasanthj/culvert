@@ -190,7 +190,7 @@
     <orderEntry type="library" name="Maven: oro:oro:2.0.8" level="project" />
     <orderEntry type="library" name="Maven: org.apache.hive:hive-llap-tez:3.0.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.apache.hive:hive-llap-client:3.0.0-SNAPSHOT" level="project" />
-    <orderEntry type="library" name="Maven: commons-codec:commons-codec:1.4" level="project" />
+    <orderEntry type="library" name="Maven: commons-codec:commons-codec:1.7" level="project" />
     <orderEntry type="library" name="Maven: commons-httpclient:commons-httpclient:3.0.1" level="project" />
     <orderEntry type="library" name="Maven: junit:junit:3.8.1" level="project" />
     <orderEntry type="library" name="Maven: commons-io:commons-io:2.4" level="project" />
@@ -302,7 +302,7 @@
     <orderEntry type="library" name="Maven: io.netty:netty-all:4.0.23.Final" level="project" />
     <orderEntry type="library" name="Maven: org.fusesource.leveldbjni:leveldbjni-all:1.8" level="project" />
     <orderEntry type="library" name="Maven: org.slf4j:slf4j-api:1.7.10" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.hive.hcatalog:hive-hcatalog-streaming:3.0.0-SNAPSHOT" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.hive:hive-streaming:3.0.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.apache.hive:hive-serde:3.0.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: org.apache.hive:hive-service-rpc:3.0.0-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Maven: net.sf.opencsv:opencsv:2.3" level="project" />
