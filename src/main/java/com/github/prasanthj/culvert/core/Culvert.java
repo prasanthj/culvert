@@ -23,12 +23,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hive.streaming.HiveEndPoint;
+import org.apache.hive.streaming.HiveStreamingConnection;
+import org.apache.hive.streaming.StrictDelimitedInputWriter;
 
 /**
  *
  */
 public class Culvert {
+  static String dbName = "default";
+  static String tableName = "culvert";
   private String name;
   private List<Stream> streams;
   private int culvertDelay;
@@ -229,31 +232,47 @@ public class Culvert {
   }
 
   public static void main(String[] args) {
-    String metastoreUri = "thrift://localhost:9083";
-    HiveEndPoint hiveEndPoint1 = new HiveEndPoint(metastoreUri, "default", "culvert", Arrays.asList("2018", "1"));
+    HiveStreamingConnection.Builder connection1 = getStreamingConnection(Arrays.asList("2018", "1"));
+    HiveStreamingConnection.Builder connection2 = getStreamingConnection(Arrays.asList("2018", "2"));
+    HiveStreamingConnection.Builder connection3 = getStreamingConnection(Arrays.asList("2018", "3"));
+    HiveStreamingConnection.Builder connection4 = getStreamingConnection(Arrays.asList("2018", "4"));
+    int commitAfterNRows = 10000;
     Stream stream1 = Stream.newBuilder()
-      .withName("click-stream-1")
-      .withEventsPerSecond(100)
-      .withHiveEndPoint(hiveEndPoint1)
+      .withName("stream-1")
+      .withEmitStreamName(false)
+      .withCommitAfterRows(commitAfterNRows)
+      .withEmitRowId(false)
+      .withEventsPerSecond(300)
+      .withHiveStreamingConnectionBuilder(connection1)
       .build();
-    HiveEndPoint hiveEndPoint2 = new HiveEndPoint(metastoreUri, "default", "culvert", Arrays.asList("2018", "2"));
+
     Stream stream2 = Stream.newBuilder()
-      .withName("click-stream-2")
-      .withEventsPerSecond(500)
-      .withHiveEndPoint(hiveEndPoint2)
+      .withName("stream-2")
+      .withEmitStreamName(false)
+      .withCommitAfterRows(commitAfterNRows)
+      .withEmitRowId(false)
+      .withEventsPerSecond(600)
+      .withHiveStreamingConnectionBuilder(connection2)
       .build();
-    HiveEndPoint hiveEndPoint3 = new HiveEndPoint(metastoreUri, "default", "culvert", Arrays.asList("2018", "3"));
+
     Stream stream3 = Stream.newBuilder()
-      .withName("click-stream-3")
+      .withName("stream-3")
+      .withEmitStreamName(false)
+      .withCommitAfterRows(commitAfterNRows)
+      .withEmitRowId(false)
       .withEventsPerSecond(1000)
-      .withHiveEndPoint(hiveEndPoint3)
+      .withHiveStreamingConnectionBuilder(connection3)
       .build();
-    HiveEndPoint hiveEndPoint4 = new HiveEndPoint(metastoreUri, "default", "culvert", Arrays.asList("2018", "4"));
+
     Stream stream4 = Stream.newBuilder()
-      .withName("click-stream-4")
-      .withEventsPerSecond(800)
-      .withHiveEndPoint(hiveEndPoint4)
+      .withName("stream-4")
+      .withEmitStreamName(false)
+      .withCommitAfterRows(commitAfterNRows)
+      .withEmitRowId(false)
+      .withEventsPerSecond(10000)
+      .withHiveStreamingConnectionBuilder(connection4)
       .build();
+
     Culvert culvert = Culvert.newBuilder()
       .addStream(stream1)
       .addStream(stream2)
@@ -266,5 +285,17 @@ public class Culvert {
       .withTimeout(TimeUnit.MINUTES.toMillis(2))
       .build();
     culvert.run();
+  }
+
+  private static HiveStreamingConnection.Builder getStreamingConnection(final List<String> staticPartitions) {
+    StrictDelimitedInputWriter writer = StrictDelimitedInputWriter.newBuilder()
+      .withFieldDelimiter(',')
+      .build();
+    return HiveStreamingConnection.newBuilder()
+      .withDatabase(dbName)
+      .withTable(tableName)
+      .withStaticPartitionValues(staticPartitions)
+      .withRecordWriter(writer)
+      .withTransactionBatchSize(100);
   }
 }
