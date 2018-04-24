@@ -59,7 +59,7 @@ public class Stream implements Runnable {
     if (streamingConnection == null) {
       streamingConnection = streamingConnectionBuilder.connect();
       try {
-        streamingConnection.beginNextTransaction();
+        streamingConnection.beginTransaction();
       } catch (StreamingException connectionError) {
         connectionError.printStackTrace();
       }
@@ -205,13 +205,12 @@ public class Stream implements Runnable {
           }
           streamingConnection.write(row.getBytes("UTF-8"));
           if (rowsWritten > 0 && (rowsWritten % commitAfterNRows == 0)) {
-            streamingConnection.commit();
-            streamingConnection.beginNextTransaction();
+            streamingConnection.commitTransaction();
+            streamingConnection.beginTransaction();
             rowsCommitted = rowsWritten;
             txnBatchesCommitted++;
             System.out.println("Stream [" + name + "] committed " + txnBatchesCommitted + " transactions [rows: " +
-              rowsCommitted + ", currTxnId: " + streamingConnection.getCurrentTxnId() + ", currWriteId: " +
-              streamingConnection.getCurrentWriteId() + "]..");
+              rowsCommitted + "]..");
           }
         }
         if (sleepMs > 0) {

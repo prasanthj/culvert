@@ -287,6 +287,20 @@ public class Culvert {
     culvert.run();
   }
 
+  // Table schema:
+  // create table if not exists culvert (
+  //  user_id string,
+  //  page_id string,
+  //  ad_id string,
+  //  ad_type string,
+  //  event_type string,
+  //  event_time string,
+  //  ip_address string)
+  // partitioned by (year int, month int)
+  // clustered by (user_id)
+  // into 8 buckets
+  // stored as orc
+  // tblproperties("transactional"="true");
   private static HiveStreamingConnection.Builder getStreamingConnection(final List<String> staticPartitions) {
     StrictDelimitedInputWriter writer = StrictDelimitedInputWriter.newBuilder()
       .withFieldDelimiter(',')
