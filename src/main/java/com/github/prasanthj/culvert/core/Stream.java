@@ -169,9 +169,6 @@ public class Stream implements Runnable {
   public void run() {
     Thread.currentThread().setName(name);
     Thread.setDefaultUncaughtExceptionHandler((t, e) -> close());
-    if (timeout > 0) {
-      startTimeoutThread();
-    }
     long txnBatchesCommitted = 0;
     try {
       startStreamingConnection();
@@ -179,6 +176,9 @@ public class Stream implements Runnable {
       System.err.println("Unable to start hive streaming connection");
       e.printStackTrace();
       return;
+    }
+    if (timeout > 0) {
+      startTimeoutThread();
     }
     while (!isClosed.get() && !Thread.interrupted()) {
       rowsWritten++;
@@ -193,9 +193,6 @@ public class Stream implements Runnable {
         } else {
           streamingConnection.write(row.getBytes("UTF-8"));
           if (rowsWritten > 0 && (rowsWritten % commitAfterNRows == 0)) {
-            if (isClosed.get() || Thread.interrupted()) {
-              break;
-            }
             streamingConnection.commitTransaction();
             streamingConnection.beginTransaction();
             rowsCommitted = rowsWritten;
@@ -214,6 +211,7 @@ public class Stream implements Runnable {
         break;
       }
     }
+
     close();
     if (countDownLatch != null) {
       countDownLatch.countDown();

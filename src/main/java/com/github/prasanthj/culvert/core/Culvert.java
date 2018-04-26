@@ -129,7 +129,7 @@ public class Culvert {
     HiveStreamingConnection.Builder connection3 = getStreamingConnection(Arrays.asList("2018", "3"));
     HiveStreamingConnection.Builder connection4 = getStreamingConnection(Arrays.asList("2018", "4"));
     int commitAfterNRows = 10000;
-    long timeout = TimeUnit.SECONDS.toMillis(30);
+    long timeout = TimeUnit.SECONDS.toMillis(60);
     Stream stream1 = Stream.newBuilder()
       .withName("stream-1")
       .withCommitAfterRows(commitAfterNRows)
@@ -203,6 +203,7 @@ public class Culvert {
       .withTable(tableName)
       .withStaticPartitionValues(staticPartitions)
       .withRecordWriter(writer)
-      .withTransactionBatchSize(1);
+      .withStreamingOptimizations(true)
+      .withTransactionBatchSize(10);
   }
 }
