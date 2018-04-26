@@ -15,7 +15,6 @@
  */
 package com.github.prasanthj.culvert.core;
 
-import java.time.Instant;
 import java.util.Random;
 import java.util.UUID;
 
@@ -33,7 +32,9 @@ public class Column {
     STRING_UUID,
     LONG,
     DOUBLE,
-    TIMESTAMP
+    TIMESTAMP,
+    INT_YEAR,
+    INT_MONTH
   }
 
   private String name;
@@ -102,6 +103,10 @@ public class Column {
         return faker.internet().ipV4Address();
       case STRING_UUID:
         return UUID.randomUUID().toString();
+      case INT_YEAR:
+        return faker.date().birthday().getYear();
+      case INT_MONTH:
+        return faker.date().birthday().getMonth();
       default:
         return faker.chuckNorris().fact();
     }

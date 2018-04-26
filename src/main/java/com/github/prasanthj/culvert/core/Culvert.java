@@ -18,6 +18,7 @@ package com.github.prasanthj.culvert.core;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -34,22 +35,14 @@ public class Culvert {
   static String tableName = "culvert";
   private String name;
   private List<Stream> streams;
-  private int culvertDelay;
   private int streamDelay;
   private Column[] columnsOverride;
   private ExecutorService executorService;
-  private boolean emitRowId;
-  private boolean emitStreamName;
-  private int txnsPerBatch;
-  private int commitAfterNRows;
   private boolean isStopped = false;
 
-  private Culvert(final String name, List<Stream> streams, int culvertDelay, int streamDelay, Column[] columns,
-    boolean emitRowId, boolean emitStreamName, int txnsPerBatch, int commitAfterNRows,
-    long timeout) {
+  private Culvert(final String name, List<Stream> streams, int streamDelay, Column[] columns) {
     this.name = name;
     this.streams = streams;
-    this.culvertDelay = culvertDelay;
     this.streamDelay = streamDelay;
     this.columnsOverride = columns;
     if (columnsOverride != null) {
@@ -57,52 +50,14 @@ public class Culvert {
         stream.setColumns(columns);
       }
     }
-    this.emitRowId = emitRowId;
-    if (emitRowId) {
-      for (Stream stream : streams) {
-        stream.setEmitRowId(true);
-      }
-    }
-    this.emitStreamName = emitStreamName;
-    if (emitStreamName) {
-      for (Stream stream : streams) {
-        stream.setEmitStreamName(true);
-      }
-    }
-    this.txnsPerBatch = txnsPerBatch;
-    if (txnsPerBatch > 0) {
-      for (Stream stream : streams) {
-        stream.setTxnsPerBatch(txnsPerBatch);
-      }
-    }
-    this.commitAfterNRows = commitAfterNRows;
-    if (commitAfterNRows > 0) {
-      for (Stream stream : streams) {
-        stream.setCommitAfterNRows(commitAfterNRows);
-      }
-    }
     this.executorService = Executors.newFixedThreadPool(streams.size());
-    ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
-    scheduledExecutor.schedule(() -> {
-      System.err.println("Timeout " + timeout + "ms expired. Shutting down streams..");
-      for (Stream stream : streams) {
-        stream.close();
-      }
-      isStopped = true;
-    }, timeout, TimeUnit.MILLISECONDS);
   }
 
   private static class CulvertBuilder {
     private String name = "culvert";
     private List<Stream> streams = new ArrayList<Stream>();
     private Column[] columns;
-    private boolean emitRowId;
-    private boolean emitStreamName;
-    private int culvertLaunchDelayMs = 1000;
     private int streamLaunchDelayMs = 1000;
-    private int txnsPerBatch = 10;
-    private int commitAfterNRows = 10000;
-    private long timeout = -1;
 
     public CulvertBuilder withName(String name) {
       this.name = name;
@@ -111,11 +66,6 @@ public class Culvert {
 
     public CulvertBuilder addStream(Stream stream) {
       this.streams.add(stream);
-      return this;
-    }
-
-    public CulvertBuilder withCulvertLaunchDelay(int delayMs) {
-      this.culvertLaunchDelayMs = delayMs;
       return this;
     }
 
@@ -129,34 +79,8 @@ public class Culvert {
       return this;
     }
 
-    public CulvertBuilder withEmitRowId(boolean emitRowId) {
-      this.emitRowId = emitRowId;
-      return this;
-    }
-
-    public CulvertBuilder withEmitStreamName(boolean emitStreamName) {
-      this.emitStreamName = emitStreamName;
-      return this;
-    }
-
-    public CulvertBuilder withTxnsPerBatch(int txnsPerBatch) {
-      this.txnsPerBatch = txnsPerBatch;
-      return this;
-    }
-
-    public CulvertBuilder withCommitAfterRows(int numRows) {
-      this.commitAfterNRows = numRows;
-      return this;
-    }
-
-    public CulvertBuilder withTimeout(long millis) {
-      this.timeout = millis;
-      return this;
-    }
-
     public Culvert build() {
-      return new Culvert(name, new ArrayList<>(streams), culvertLaunchDelayMs, streamLaunchDelayMs,
-        columns, emitRowId, emitStreamName, txnsPerBatch, commitAfterNRows, timeout);
+      return new Culvert(name, new ArrayList<>(streams), streamLaunchDelayMs, columns);
     }
   }
 
@@ -164,15 +88,11 @@ public class Culvert {
     return new CulvertBuilder();
   }
 
-  public void run() {
+  public void run(CountDownLatch countDownLatch) {
     try {
-      if (culvertDelay > 0) {
-        System.err.println("Waiting " + culvertDelay + "ms to start culvert: " + getName());
-        Thread.sleep(culvertDelay);
-      } else {
-        System.err.println("Starting culvert: " + getName());
-      }
+      System.err.println("Starting culvert: " + getName());
       for (Stream stream : streams) {
+        stream.setCountDownLatch(countDownLatch);
         if (streamDelay > 0) {
           System.err.println("Waiting " + streamDelay + "ms to start next stream: " + stream.getName());
           Thread.sleep(streamDelay);
@@ -183,16 +103,8 @@ public class Culvert {
       }
     } catch (Exception e) {
       System.err.println("Culvert run failed! error: " + e.getMessage());
-      // ignore
+      e.printStackTrace();
     }
-    while (!isStopped && !Thread.interrupted()) {
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-        // ignore
-      }
-    }
-    System.exit(0);
   }
 
   public String getName() {
@@ -203,10 +115,6 @@ public class Culvert {
     return streams;
   }
 
-  public int getCulvertDelay() {
-    return culvertDelay;
-  }
-
   public int getStreamDelay() {
     return streamDelay;
   }
@@ -215,61 +123,42 @@ public class Culvert {
     return columnsOverride;
   }
 
-  public boolean isEmitRowId() {
-    return emitRowId;
-  }
-
-  public boolean isEmitStreamName() {
-    return emitStreamName;
-  }
-
-  public int getTxnsPerBatch() {
-    return txnsPerBatch;
-  }
-
-  public int getCommitAfterNRows() {
-    return commitAfterNRows;
-  }
-
   public static void main(String[] args) {
     HiveStreamingConnection.Builder connection1 = getStreamingConnection(Arrays.asList("2018", "1"));
     HiveStreamingConnection.Builder connection2 = getStreamingConnection(Arrays.asList("2018", "2"));
     HiveStreamingConnection.Builder connection3 = getStreamingConnection(Arrays.asList("2018", "3"));
     HiveStreamingConnection.Builder connection4 = getStreamingConnection(Arrays.asList("2018", "4"));
     int commitAfterNRows = 10000;
+    long timeout = TimeUnit.SECONDS.toMillis(30);
     Stream stream1 = Stream.newBuilder()
       .withName("stream-1")
-      .withEmitStreamName(false)
       .withCommitAfterRows(commitAfterNRows)
-      .withEmitRowId(false)
-      .withEventsPerSecond(300)
+      .withEventsPerSecond(10000)
+      .withTimeout(timeout)
       .withHiveStreamingConnectionBuilder(connection1)
       .build();
 
     Stream stream2 = Stream.newBuilder()
       .withName("stream-2")
-      .withEmitStreamName(false)
       .withCommitAfterRows(commitAfterNRows)
-      .withEmitRowId(false)
-      .withEventsPerSecond(600)
+      .withEventsPerSecond(10000)
+      .withTimeout(timeout)
       .withHiveStreamingConnectionBuilder(connection2)
       .build();
 
     Stream stream3 = Stream.newBuilder()
       .withName("stream-3")
-      .withEmitStreamName(false)
       .withCommitAfterRows(commitAfterNRows)
-      .withEmitRowId(false)
-      .withEventsPerSecond(1000)
+      .withEventsPerSecond(10000)
+      .withTimeout(timeout)
       .withHiveStreamingConnectionBuilder(connection3)
       .build();
 
     Stream stream4 = Stream.newBuilder()
       .withName("stream-4")
-      .withEmitStreamName(false)
       .withCommitAfterRows(commitAfterNRows)
-      .withEmitRowId(false)
       .withEventsPerSecond(10000)
+      .withTimeout(timeout)
       .withHiveStreamingConnectionBuilder(connection4)
       .build();
 
@@ -278,13 +167,17 @@ public class Culvert {
       .addStream(stream2)
       .addStream(stream3)
       .addStream(stream4)
-      .withCulvertLaunchDelay(0)
       .withStreamLaunchDelay(0)
-      .withEmitRowId(false)
-      .withEmitStreamName(false)
-      .withTimeout(TimeUnit.MINUTES.toMillis(2))
       .build();
-    culvert.run();
+    int streamSize = culvert.getStreams().size();
+    CountDownLatch countDownLatch = new CountDownLatch(streamSize);
+    culvert.run(countDownLatch);
+    try {
+      countDownLatch.await();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+    System.exit(0);
   }
 
   // Table schema:
@@ -310,6 +203,6 @@ public class Culvert {
       .withTable(tableName)
       .withStaticPartitionValues(staticPartitions)
       .withRecordWriter(writer)
-      .withTransactionBatchSize(100);
+      .withTransactionBatchSize(1);
   }
 }

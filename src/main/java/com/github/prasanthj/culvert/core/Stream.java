@@ -18,6 +18,11 @@ package com.github.prasanthj.culvert.core;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.StringJoiner;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hive.streaming.HiveStreamingConnection;
 import org.apache.hive.streaming.StreamingConnection;
@@ -32,27 +37,26 @@ public class Stream implements Runnable {
   private Column[] columns;
   private OutputStream outputStream;
   private long sleepMs;
-  private boolean emitRowId;
-  private boolean emitStreamName;
   private final HiveStreamingConnection.Builder streamingConnectionBuilder;
   private StreamingConnection streamingConnection;
   private int txnsPerBatch;
   private int commitAfterNRows;
-  private boolean isClosed = false;
+  private AtomicBoolean isClosed = new AtomicBoolean(false);
   private long rowsCommitted = 0;
   private long rowsWritten = 0;
+  private long timeout;
+  private CountDownLatch countDownLatch;
 
-  private Stream(String name, Column[] columns, OutputStream outputStream, double eventsPerSecond, boolean emitRowId,
-    boolean emitStreamName, HiveStreamingConnection.Builder streamingConnection, int txnsPerBatch, int commitAfterNRows) {
+  private Stream(String name, Column[] columns, OutputStream outputStream, double eventsPerSecond,
+    HiveStreamingConnection.Builder streamingConnection, int txnsPerBatch, int commitAfterNRows, final long timeout) {
     this.name = name;
     this.columns = columns;
     this.outputStream = outputStream;
     this.sleepMs = eventsPerSecond == 0 ? 0 : (long) (1000.0 / eventsPerSecond);
-    this.emitRowId = emitRowId;
-    this.emitStreamName = emitStreamName;
     this.streamingConnectionBuilder = streamingConnection;
     this.txnsPerBatch = txnsPerBatch;
     this.commitAfterNRows = commitAfterNRows;
+    this.timeout = timeout;
   }
 
   private void startStreamingConnection() throws StreamingException {
@@ -68,14 +72,6 @@ public class Stream implements Runnable {
 
   void setColumns(final Column[] columns) {
     this.columns = columns;
-  }
-
-  void setEmitRowId(boolean emitRowId) {
-    this.emitRowId = emitRowId;
-  }
-
-  void setEmitStreamName(boolean emitStreamName) {
-    this.emitStreamName = emitStreamName;
   }
 
   void setTxnsPerBatch(final int txnsPerBatch) {
@@ -95,11 +91,10 @@ public class Stream implements Runnable {
     private Column[] columns = null;
     private OutputStream outputStream = System.out;
     private double eventsPerSecond = 10.0;
-    private boolean emitRowId = false;
-    private boolean emitStreamName = false;
     private HiveStreamingConnection.Builder streamingConnection;
     private int txnsPerBatch = 10;
     private int commitAfterNRows = 10000;
+    private long timeout = -1;
 
     public StreamBuilder withName(String name) {
       this.name = name;
@@ -121,16 +116,6 @@ public class Stream implements Runnable {
       return this;
     }
 
-    public StreamBuilder withEmitRowId(boolean emitRowId) {
-      this.emitRowId = emitRowId;
-      return this;
-    }
-
-    public StreamBuilder withEmitStreamName(boolean emitStreamName) {
-      this.emitStreamName = emitStreamName;
-      return this;
-    }
-
     public StreamBuilder withHiveStreamingConnectionBuilder(HiveStreamingConnection.Builder streamingConnection) {
       this.streamingConnection = streamingConnection;
       return this;
@@ -146,12 +131,16 @@ public class Stream implements Runnable {
       return this;
     }
 
+    public StreamBuilder withTimeout(final long timeout) {
+      this.timeout = timeout;
+      return this;
+    }
     public Stream build() {
       if (columns == null) {
         populatedDefaultColumns();
       }
-      return new Stream(name, columns, outputStream, eventsPerSecond, emitRowId, emitStreamName, streamingConnection,
-        txnsPerBatch, commitAfterNRows);
+      return new Stream(name, columns, outputStream, eventsPerSecond, streamingConnection, txnsPerBatch,
+        commitAfterNRows, timeout);
     }
 
     // schema from https://yahooeng.tumblr.com/post/135321837876/benchmarking-streaming-computation-engines-at
@@ -168,6 +157,10 @@ public class Stream implements Runnable {
         .build();
       cols[5] = Column.newBuilder().withName("event_time").withType(Column.Type.TIMESTAMP).build();
       cols[6] = Column.newBuilder().withName("ip_address").withType(Column.Type.STRING_IPADDRESS).build();
+
+      // partitioning columns
+//      cols[7] = Column.newBuilder().withName("year").withType(Column.Type.INT_YEAR).build();
+//      cols[8] = Column.newBuilder().withName("month").withType(Column.Type.INT_MONTH).build();
       columns = cols;
     }
   }
@@ -176,35 +169,33 @@ public class Stream implements Runnable {
   public void run() {
     Thread.currentThread().setName(name);
     Thread.setDefaultUncaughtExceptionHandler((t, e) -> close());
+    if (timeout > 0) {
+      startTimeoutThread();
+    }
     long txnBatchesCommitted = 0;
     try {
       startStreamingConnection();
     } catch (StreamingException e) {
       System.err.println("Unable to start hive streaming connection");
+      e.printStackTrace();
       return;
     }
-    while (!isClosed && !Thread.interrupted()) {
-      StringJoiner stringJoiner = new StringJoiner(",");
-      if (emitStreamName) {
-        stringJoiner.add("" + name);
-      }
+    while (!isClosed.get() && !Thread.interrupted()) {
       rowsWritten++;
-      if (emitRowId) {
-        stringJoiner.add("" + rowsWritten);
-      }
+      StringJoiner stringJoiner = new StringJoiner(",");
       for (Column column : columns) {
         stringJoiner.add(column.getValue().toString());
       }
-      String row = stringJoiner.toString() + "\n";
+      String row = stringJoiner.toString() + ",\n";
       try {
         if (streamingConnection == null) {
           outputStream.write(row.getBytes("UTF-8"));
         } else {
-          if (isClosed) {
-            throw new RuntimeException("Cannot write to closed stream: " + name);
-          }
           streamingConnection.write(row.getBytes("UTF-8"));
           if (rowsWritten > 0 && (rowsWritten % commitAfterNRows == 0)) {
+            if (isClosed.get() || Thread.interrupted()) {
+              break;
+            }
             streamingConnection.commitTransaction();
             streamingConnection.beginTransaction();
             rowsCommitted = rowsWritten;
@@ -218,20 +209,37 @@ public class Stream implements Runnable {
         }
       } catch (IOException | InterruptedException | StreamingException e) {
         System.err.println("Stream [" + name + "] died! error: " + e.getMessage());
+        e.printStackTrace();
         close();
         break;
       }
     }
+    close();
+    if (countDownLatch != null) {
+      countDownLatch.countDown();
+    }
   }
 
-  public void close() {
-    synchronized (streamingConnection) {
+  private void startTimeoutThread() {
+    ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
+    scheduledExecutor.schedule(() -> {
+      System.err.println("Timeout " + timeout + "ms expired. Shutting down streams.. ");
+      isClosed.set(true);
+    }, timeout, TimeUnit.MILLISECONDS);
+  }
+
+  private void close() {
+    if (streamingConnection != null) {
       streamingConnection.close();
-      isClosed = true;
+      streamingConnection = null;
+      isClosed.set(true);
       System.err.println("Closed [" + name + "]. Rows committed: " + rowsCommitted);
     }
   }
 
+  public void setCountDownLatch(CountDownLatch countDownLatch) {
+    this.countDownLatch = countDownLatch;
+  }
 
   public String getName() {
     return name;
@@ -247,14 +255,6 @@ public class Stream implements Runnable {
 
   public long getSleepMs() {
     return sleepMs;
-  }
-
-  public boolean isEmitRowId() {
-    return emitRowId;
-  }
-
-  public boolean isEmitStreamName() {
-    return emitStreamName;
   }
 
   public int getTxnsPerBatch() {
