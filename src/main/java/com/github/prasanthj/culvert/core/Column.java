@@ -28,7 +28,7 @@ public class Column {
     BOOLEAN,
     STRING,
     STRING_DICT,
-    STRING_IPADDRESS,
+    STRING_IP_ADDRESS,
     STRING_UUID,
     LONG,
     DOUBLE,
@@ -47,8 +47,8 @@ public class Column {
     this.name = name;
     this.type = type;
     this.dictionary = dictionary;
-    this.faker = new Faker();
-    this.random = new Random();
+    this.random = new Random(123);
+    this.faker = new Faker(random);
   }
 
   public static class ColumnBuilder {
@@ -99,14 +99,14 @@ public class Column {
         }
         // if dictionary unspecified use colors
         return faker.color().name();
-      case STRING_IPADDRESS:
+      case STRING_IP_ADDRESS:
         return faker.internet().ipV4Address();
       case STRING_UUID:
         return UUID.randomUUID().toString();
       case INT_YEAR:
-        return faker.date().birthday().getYear();
+        return 2000 + (faker.date().birthday().getYear() % 50);
       case INT_MONTH:
-        return faker.date().birthday().getMonth();
+        return faker.date().birthday().getMonth() % 30; // 50 * 30 partitions max
       default:
         return faker.chuckNorris().fact();
     }

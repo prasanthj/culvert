@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hive.streaming.HiveStreamingConnection;
@@ -31,23 +30,25 @@ import org.apache.hive.streaming.StrictDelimitedInputWriter;
  *
  */
 public class Culvert {
-  static String dbName = "default";
-  static String tableName = "culvert";
   private String name;
   private List<Stream> streams;
   private int streamDelay;
   private Column[] columnsOverride;
   private ExecutorService executorService;
-  private boolean isStopped = false;
 
-  private Culvert(final String name, List<Stream> streams, int streamDelay, Column[] columns) {
-    this.name = name;
-    this.streams = streams;
-    this.streamDelay = streamDelay;
-    this.columnsOverride = columns;
+  private Culvert(CulvertBuilder builder) {
+    this.name = builder.name;
+    this.streams = builder.streams;
+    this.streamDelay = builder.streamLaunchDelayMs;
+    this.columnsOverride = builder.columns;
     if (columnsOverride != null) {
       for (Stream stream : streams) {
-        stream.setColumns(columns);
+        stream.setColumns(builder.columns);
+      }
+    }
+    if (builder.dp) {
+      for (Stream stream : streams) {
+        stream.setDynamicPartition();
       }
     }
     this.executorService = Executors.newFixedThreadPool(streams.size());
@@ -58,6 +59,7 @@ public class Culvert {
     private List<Stream> streams = new ArrayList<Stream>();
     private Column[] columns;
     private int streamLaunchDelayMs = 1000;
+    private boolean dp;
 
     public CulvertBuilder withName(String name) {
       this.name = name;
@@ -79,8 +81,13 @@ public class Culvert {
       return this;
     }
 
+    public CulvertBuilder withDynamicPartitioning(boolean dp) {
+      this.dp = dp;
+      return this;
+    }
+
     public Culvert build() {
-      return new Culvert(name, new ArrayList<>(streams), streamLaunchDelayMs, columns);
+      return new Culvert(this);
     }
   }
 
@@ -124,16 +131,23 @@ public class Culvert {
   }
 
   public static void main(String[] args) {
-    HiveStreamingConnection.Builder connection1 = getStreamingConnection(Arrays.asList("2018", "1"));
-    HiveStreamingConnection.Builder connection2 = getStreamingConnection(Arrays.asList("2018", "2"));
-    HiveStreamingConnection.Builder connection3 = getStreamingConnection(Arrays.asList("2018", "3"));
-    HiveStreamingConnection.Builder connection4 = getStreamingConnection(Arrays.asList("2018", "4"));
-    int commitAfterNRows = 10000;
-    long timeout = TimeUnit.SECONDS.toMillis(60);
+    int commitAfterNRows = 1_000_000;
+    long timeout = TimeUnit.SECONDS.toMillis(120);
+    boolean dynamicPartitioning = false;
+    boolean streamingOptimizations = true;
+    int transactionBatchSize = 1;
+    HiveStreamingConnection.Builder connection1 = getStreamingConnection(Arrays.asList("2018", "1"),
+      dynamicPartitioning, streamingOptimizations, transactionBatchSize);
+    HiveStreamingConnection.Builder connection2 = getStreamingConnection(Arrays.asList("2018", "2"),
+      dynamicPartitioning, streamingOptimizations, transactionBatchSize);
+    HiveStreamingConnection.Builder connection3 = getStreamingConnection(Arrays.asList("2018", "3"),
+      dynamicPartitioning, streamingOptimizations, transactionBatchSize);
+    HiveStreamingConnection.Builder connection4 = getStreamingConnection(Arrays.asList("2018", "4"),
+      dynamicPartitioning, streamingOptimizations, transactionBatchSize);
     Stream stream1 = Stream.newBuilder()
       .withName("stream-1")
       .withCommitAfterRows(commitAfterNRows)
-      .withEventsPerSecond(10000)
+      .withEventsPerSecond(100)
       .withTimeout(timeout)
       .withHiveStreamingConnectionBuilder(connection1)
       .build();
@@ -141,7 +155,7 @@ public class Culvert {
     Stream stream2 = Stream.newBuilder()
       .withName("stream-2")
       .withCommitAfterRows(commitAfterNRows)
-      .withEventsPerSecond(10000)
+      .withEventsPerSecond(500)
       .withTimeout(timeout)
       .withHiveStreamingConnectionBuilder(connection2)
       .build();
@@ -149,7 +163,7 @@ public class Culvert {
     Stream stream3 = Stream.newBuilder()
       .withName("stream-3")
       .withCommitAfterRows(commitAfterNRows)
-      .withEventsPerSecond(10000)
+      .withEventsPerSecond(1000)
       .withTimeout(timeout)
       .withHiveStreamingConnectionBuilder(connection3)
       .build();
@@ -167,6 +181,7 @@ public class Culvert {
       .addStream(stream2)
       .addStream(stream3)
       .addStream(stream4)
+      .withDynamicPartitioning(dynamicPartitioning)
       .withStreamLaunchDelay(0)
       .build();
     int streamSize = culvert.getStreams().size();
@@ -194,16 +209,19 @@ public class Culvert {
   // into 8 buckets
   // stored as orc
   // tblproperties("transactional"="true");
-  private static HiveStreamingConnection.Builder getStreamingConnection(final List<String> staticPartitions) {
+  private static HiveStreamingConnection.Builder getStreamingConnection(final List<String> staticPartitions,
+    final boolean dynamicPartitioning, final boolean streamingOptimizations, final int transactionBatchSize) {
     StrictDelimitedInputWriter writer = StrictDelimitedInputWriter.newBuilder()
       .withFieldDelimiter(',')
       .build();
+    final String dbName = "default";
+    final String tableName = "culvert";
     return HiveStreamingConnection.newBuilder()
       .withDatabase(dbName)
       .withTable(tableName)
-      .withStaticPartitionValues(staticPartitions)
+      .withStaticPartitionValues(dynamicPartitioning ? null : staticPartitions)
       .withRecordWriter(writer)
-      .withStreamingOptimizations(true)
-      .withTransactionBatchSize(10);
+      .withStreamingOptimizations(streamingOptimizations)
+      .withTransactionBatchSize(transactionBatchSize);
   }
 }

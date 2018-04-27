@@ -17,6 +17,9 @@ package com.github.prasanthj.culvert.core;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.StringJoiner;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -34,7 +37,7 @@ import org.apache.hive.streaming.StreamingException;
 public class Stream implements Runnable {
   private static int streamIdx = 0;
   private String name;
-  private Column[] columns;
+  private List<Column> columns;
   private OutputStream outputStream;
   private long sleepMs;
   private final HiveStreamingConnection.Builder streamingConnectionBuilder;
@@ -47,16 +50,15 @@ public class Stream implements Runnable {
   private long timeout;
   private CountDownLatch countDownLatch;
 
-  private Stream(String name, Column[] columns, OutputStream outputStream, double eventsPerSecond,
-    HiveStreamingConnection.Builder streamingConnection, int txnsPerBatch, int commitAfterNRows, final long timeout) {
-    this.name = name;
-    this.columns = columns;
-    this.outputStream = outputStream;
-    this.sleepMs = eventsPerSecond == 0 ? 0 : (long) (1000.0 / eventsPerSecond);
-    this.streamingConnectionBuilder = streamingConnection;
-    this.txnsPerBatch = txnsPerBatch;
-    this.commitAfterNRows = commitAfterNRows;
-    this.timeout = timeout;
+  public Stream(final StreamBuilder builder) {
+    this.name = builder.name;
+    this.columns = new ArrayList<>(Arrays.asList(builder.columns));
+    this.outputStream = builder.outputStream;
+    this.sleepMs = builder.eventsPerSecond == 0 ? 0 : (long) (1000.0 / builder.eventsPerSecond);
+    this.streamingConnectionBuilder = builder.streamingConnection;
+    this.txnsPerBatch = builder.txnsPerBatch;
+    this.commitAfterNRows = builder.commitAfterNRows;
+    this.timeout = builder.timeout;
   }
 
   private void startStreamingConnection() throws StreamingException {
@@ -71,7 +73,12 @@ public class Stream implements Runnable {
   }
 
   void setColumns(final Column[] columns) {
-    this.columns = columns;
+    this.columns = new ArrayList<>(Arrays.asList(columns));
+  }
+
+  void setDynamicPartition() {
+    this.columns.add(Column.newBuilder().withName("year").withType(Column.Type.INT_YEAR).build());
+    this.columns.add(Column.newBuilder().withName("month").withType(Column.Type.INT_MONTH).build());
   }
 
   void setTxnsPerBatch(final int txnsPerBatch) {
@@ -139,8 +146,7 @@ public class Stream implements Runnable {
       if (columns == null) {
         populatedDefaultColumns();
       }
-      return new Stream(name, columns, outputStream, eventsPerSecond, streamingConnection, txnsPerBatch,
-        commitAfterNRows, timeout);
+      return new Stream(this);
     }
 
     // schema from https://yahooeng.tumblr.com/post/135321837876/benchmarking-streaming-computation-engines-at
@@ -156,7 +162,7 @@ public class Stream implements Runnable {
         .withDictionary(new Object[]{"view", "click", "purchase"})
         .build();
       cols[5] = Column.newBuilder().withName("event_time").withType(Column.Type.TIMESTAMP).build();
-      cols[6] = Column.newBuilder().withName("ip_address").withType(Column.Type.STRING_IPADDRESS).build();
+      cols[6] = Column.newBuilder().withName("ip_address").withType(Column.Type.STRING_IP_ADDRESS).build();
 
       // partitioning columns
 //      cols[7] = Column.newBuilder().withName("year").withType(Column.Type.INT_YEAR).build();
@@ -204,7 +210,7 @@ public class Stream implements Runnable {
         if (sleepMs > 0) {
           Thread.sleep(sleepMs);
         }
-      } catch (IOException | InterruptedException | StreamingException e) {
+      } catch (IOException | InterruptedException | StreamingException | IllegalStateException e) {
         System.err.println("Stream [" + name + "] died! error: " + e.getMessage());
         e.printStackTrace();
         close();
@@ -244,7 +250,7 @@ public class Stream implements Runnable {
   }
 
   public Column[] getColumns() {
-    return columns;
+    return columns.toArray(new Column[]{null});
   }
 
   public OutputStream getOutputStream() {
