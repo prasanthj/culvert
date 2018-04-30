@@ -23,6 +23,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hive.streaming.HiveStreamingConnection;
 import org.apache.hive.streaming.StrictDelimitedInputWriter;
 
@@ -132,60 +134,17 @@ public class Culvert {
 
   public static void main(String[] args) {
     int commitAfterNRows = 1_000_000;
-    long timeout = TimeUnit.SECONDS.toMillis(120);
+    long timeout = TimeUnit.SECONDS.toMillis(60);
     boolean dynamicPartitioning = false;
     boolean streamingOptimizations = true;
     int transactionBatchSize = 1;
-    HiveStreamingConnection.Builder connection1 = getStreamingConnection(Arrays.asList("2018", "1"),
-      dynamicPartitioning, streamingOptimizations, transactionBatchSize);
-    HiveStreamingConnection.Builder connection2 = getStreamingConnection(Arrays.asList("2018", "2"),
-      dynamicPartitioning, streamingOptimizations, transactionBatchSize);
-    HiveStreamingConnection.Builder connection3 = getStreamingConnection(Arrays.asList("2018", "3"),
-      dynamicPartitioning, streamingOptimizations, transactionBatchSize);
-    HiveStreamingConnection.Builder connection4 = getStreamingConnection(Arrays.asList("2018", "4"),
-      dynamicPartitioning, streamingOptimizations, transactionBatchSize);
-    Stream stream1 = Stream.newBuilder()
-      .withName("stream-1")
-      .withCommitAfterRows(commitAfterNRows)
-      .withEventsPerSecond(100)
-      .withTimeout(timeout)
-      .withHiveStreamingConnectionBuilder(connection1)
-      .build();
-
-    Stream stream2 = Stream.newBuilder()
-      .withName("stream-2")
-      .withCommitAfterRows(commitAfterNRows)
-      .withEventsPerSecond(500)
-      .withTimeout(timeout)
-      .withHiveStreamingConnectionBuilder(connection2)
-      .build();
-
-    Stream stream3 = Stream.newBuilder()
-      .withName("stream-3")
-      .withCommitAfterRows(commitAfterNRows)
-      .withEventsPerSecond(1000)
-      .withTimeout(timeout)
-      .withHiveStreamingConnectionBuilder(connection3)
-      .build();
-
-    Stream stream4 = Stream.newBuilder()
-      .withName("stream-4")
-      .withCommitAfterRows(commitAfterNRows)
-      .withEventsPerSecond(10000)
-      .withTimeout(timeout)
-      .withHiveStreamingConnectionBuilder(connection4)
-      .build();
-
-    Culvert culvert = Culvert.newBuilder()
-      .addStream(stream1)
-      .addStream(stream2)
-      .addStream(stream3)
-      .addStream(stream4)
-      .withDynamicPartitioning(dynamicPartitioning)
-      .withStreamLaunchDelay(0)
-      .build();
-    int streamSize = culvert.getStreams().size();
-    CountDownLatch countDownLatch = new CountDownLatch(streamSize);
+    int eventsPerSecond = 10_000;
+    int numParallelStreams = 1;
+    int streamLaunchDelayMs = 0;
+    boolean enableAutoFlush = true;
+    Culvert culvert = buildCulvert(numParallelStreams, commitAfterNRows, eventsPerSecond, timeout,
+      dynamicPartitioning, streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
+    CountDownLatch countDownLatch = new CountDownLatch(culvert.getStreams().size());
     culvert.run(countDownLatch);
     try {
       countDownLatch.await();
@@ -193,6 +152,29 @@ public class Culvert {
       e.printStackTrace();
     }
     System.exit(0);
+  }
+
+  private static Culvert buildCulvert(final int numParallelStreams, final int commitAfterNRows,
+    final int eventsPerSecond,
+    final long timeout, final boolean dynamicPartitioning, final boolean streamingOptimizations,
+    final int transactionBatchSize, final int streamLaunchDelayMs, final boolean enableAutoFlush) {
+    Culvert.CulvertBuilder culvertBuilder = Culvert.newBuilder();
+    for (int i = 0; i < numParallelStreams; i++) {
+      HiveStreamingConnection.Builder connection = getStreamingConnection(Arrays.asList("2018", "" + i),
+        dynamicPartitioning, streamingOptimizations, transactionBatchSize, enableAutoFlush);
+      Stream stream = Stream.newBuilder()
+        .withName("stream-" + i)
+        .withCommitAfterRows(commitAfterNRows)
+        .withEventsPerSecond(eventsPerSecond)
+        .withTimeout(timeout)
+        .withHiveStreamingConnectionBuilder(connection)
+        .build();
+      culvertBuilder.addStream(stream);
+    }
+    culvertBuilder.withDynamicPartitioning(dynamicPartitioning)
+      .withStreamLaunchDelay(streamLaunchDelayMs)
+      .build();
+    return culvertBuilder.build();
   }
 
   // Table schema:
@@ -210,18 +192,23 @@ public class Culvert {
   // stored as orc
   // tblproperties("transactional"="true");
   private static HiveStreamingConnection.Builder getStreamingConnection(final List<String> staticPartitions,
-    final boolean dynamicPartitioning, final boolean streamingOptimizations, final int transactionBatchSize) {
+    final boolean dynamicPartitioning, final boolean streamingOptimizations, final int transactionBatchSize,
+    final boolean enableAutoFlush) {
     StrictDelimitedInputWriter writer = StrictDelimitedInputWriter.newBuilder()
       .withFieldDelimiter(',')
       .build();
     final String dbName = "default";
     final String tableName = "culvert";
+    HiveConf conf = new HiveConf();
+    conf.set(MetastoreConf.ConfVars.THRIFT_URIS.getHiveName(), "thrift://localhost:9083");
+    conf.setBoolVar(HiveConf.ConfVars.HIVE_STREAMING_AUTO_FLUSH_ENABLED, enableAutoFlush);
     return HiveStreamingConnection.newBuilder()
       .withDatabase(dbName)
       .withTable(tableName)
       .withStaticPartitionValues(dynamicPartitioning ? null : staticPartitions)
       .withRecordWriter(writer)
       .withStreamingOptimizations(streamingOptimizations)
-      .withTransactionBatchSize(transactionBatchSize);
+      .withTransactionBatchSize(transactionBatchSize)
+      .withHiveConf(conf);
   }
 }
