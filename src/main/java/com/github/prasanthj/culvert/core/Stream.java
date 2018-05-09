@@ -178,9 +178,10 @@ public class Stream implements Runnable {
     long txnBatchesCommitted = 0;
     try {
       startStreamingConnection();
-    } catch (StreamingException e) {
+    } catch (Exception | Error e) {
       System.err.println("Unable to start hive streaming connection");
       e.printStackTrace();
+      close();
       return;
     }
     if (timeout > 0) {
@@ -210,7 +211,7 @@ public class Stream implements Runnable {
         if (sleepMs > 0) {
           Thread.sleep(sleepMs);
         }
-      } catch (IOException | InterruptedException | StreamingException | IllegalStateException e) {
+      } catch (Exception | Error e) {
         System.err.println("Stream [" + name + "] died! error: " + e.getMessage());
         e.printStackTrace();
         close();
@@ -219,9 +220,6 @@ public class Stream implements Runnable {
     }
 
     close();
-    if (countDownLatch != null) {
-      countDownLatch.countDown();
-    }
   }
 
   private void startTimeoutThread() {
@@ -238,6 +236,9 @@ public class Stream implements Runnable {
       streamingConnection = null;
       isClosed.set(true);
       System.err.println("Closed [" + name + "]. Rows committed: " + rowsCommitted);
+    }
+    if (countDownLatch != null) {
+      countDownLatch.countDown();
     }
   }
 
