@@ -15,6 +15,8 @@
  */
 package com.github.prasanthj.culvert.core;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
@@ -29,7 +31,7 @@ public class Column {
     STRING,
     STRING_DICT,
     STRING_IP_ADDRESS,
-    STRING_UUID,
+    STRING_UUID_DICT,
     LONG,
     DOUBLE,
     TIMESTAMP,
@@ -42,6 +44,13 @@ public class Column {
   private Object[] dictionary;
   private Faker faker;
   private Random random;
+  private static List<String> UUIDs = new ArrayList<>();
+
+  static {
+    for (int i = 0; i < 1_000_000; i++) {
+      UUIDs.add(UUID.randomUUID().toString());
+    }
+  }
 
   private Column(String name, Type type, Object[] dictionary) {
     this.name = name;
@@ -101,8 +110,8 @@ public class Column {
         return faker.color().name();
       case STRING_IP_ADDRESS:
         return faker.internet().ipV4Address();
-      case STRING_UUID:
-        return UUID.randomUUID().toString();
+      case STRING_UUID_DICT:
+        return UUIDs.get(random.nextInt(UUIDs.size()));
       case INT_YEAR:
         return 2000 + (faker.date().birthday().getYear() % 50);
       case INT_MONTH:

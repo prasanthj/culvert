@@ -15,7 +15,6 @@
  */
 package com.github.prasanthj.culvert.core;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -152,9 +151,9 @@ public class Stream implements Runnable {
     // schema from https://yahooeng.tumblr.com/post/135321837876/benchmarking-streaming-computation-engines-at
     private void populatedDefaultColumns() {
       Column[] cols = new Column[7];
-      cols[0] = Column.newBuilder().withName("user_id").withType(Column.Type.STRING_UUID).build();
-      cols[1] = Column.newBuilder().withName("page_id").withType(Column.Type.STRING_UUID).build();
-      cols[2] = Column.newBuilder().withName("ad_id").withType(Column.Type.STRING_UUID).build();
+      cols[0] = Column.newBuilder().withName("user_id").withType(Column.Type.STRING_UUID_DICT).build();
+      cols[1] = Column.newBuilder().withName("page_id").withType(Column.Type.STRING_UUID_DICT).build();
+      cols[2] = Column.newBuilder().withName("ad_id").withType(Column.Type.STRING_UUID_DICT).build();
       cols[3] = Column.newBuilder().withName("ad_type").withType(Column.Type.STRING_DICT)
         .withDictionary(new Object[]{"banner", "modal", "sponsored-search", "mail", "mobile"})
         .build();
