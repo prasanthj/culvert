@@ -34,7 +34,7 @@ import org.apache.hive.streaming.StrictDelimitedInputWriter;
 public class Culvert {
   private String name;
   private List<Stream> streams;
-  private int streamDelay;
+  private long streamDelay;
   private Column[] columnsOverride;
   private ExecutorService executorService;
 
@@ -60,7 +60,7 @@ public class Culvert {
     private String name = "culvert";
     private List<Stream> streams = new ArrayList<Stream>();
     private Column[] columns;
-    private int streamLaunchDelayMs = 1000;
+    private long streamLaunchDelayMs = 1000;
     private boolean dp;
 
     public CulvertBuilder withName(String name) {
@@ -73,7 +73,7 @@ public class Culvert {
       return this;
     }
 
-    public CulvertBuilder withStreamLaunchDelay(int delayMs) {
+    public CulvertBuilder withStreamLaunchDelay(long delayMs) {
       this.streamLaunchDelayMs = delayMs;
       return this;
     }
@@ -124,7 +124,7 @@ public class Culvert {
     return streams;
   }
 
-  public int getStreamDelay() {
+  public long getStreamDelay() {
     return streamDelay;
   }
 
@@ -142,6 +142,13 @@ public class Culvert {
     int numParallelStreams = 1;
     int streamLaunchDelayMs = 0;
     boolean enableAutoFlush = true;
+    startCulvert(numParallelStreams, commitAfterNRows, eventsPerSecond, timeout, dynamicPartitioning,
+      streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
+  }
+
+  static void startCulvert(final int numParallelStreams, final int commitAfterNRows, final int eventsPerSecond,
+    final long timeout, final boolean dynamicPartitioning, final boolean streamingOptimizations,
+    final int transactionBatchSize, final long streamLaunchDelayMs, final boolean enableAutoFlush) {
     Culvert culvert = buildCulvert(numParallelStreams, commitAfterNRows, eventsPerSecond, timeout,
       dynamicPartitioning, streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
     CountDownLatch countDownLatch = new CountDownLatch(culvert.getStreams().size());
@@ -157,7 +164,7 @@ public class Culvert {
   private static Culvert buildCulvert(final int numParallelStreams, final int commitAfterNRows,
     final int eventsPerSecond,
     final long timeout, final boolean dynamicPartitioning, final boolean streamingOptimizations,
-    final int transactionBatchSize, final int streamLaunchDelayMs, final boolean enableAutoFlush) {
+    final int transactionBatchSize, final long streamLaunchDelayMs, final boolean enableAutoFlush) {
     Culvert.CulvertBuilder culvertBuilder = Culvert.newBuilder();
     for (int i = 0; i < numParallelStreams; i++) {
       HiveStreamingConnection.Builder connection = getStreamingConnection(Arrays.asList("2018", "" + i),

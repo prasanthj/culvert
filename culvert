@@ -1,0 +1,6 @@
+#!/bin/bash -e
+
+CULVERT_HOME="$PWD"
+CULVERT_CLASSPATH="$CULVERT_HOME/target/*:$CULVERT_HOME/target/lib/*:$CULVERT_HOME/target/classes"
+
+java -cp $CULVERT_CLASSPATH com.github.prasanthj.culvert.core.CulvertCLI "$@"
