@@ -32,7 +32,8 @@ public class CulvertCLI {
     addOptions(options);
 
     CommandLineParser parser = new BasicParser();
-    CommandLine cli = null;
+    CommandLine cli;
+    String metastoreUrl = "thrift://localhost:9083";
     int commitAfterNRows = 1_000_000;
     long timeout = 60000;
     boolean dynamicPartitioning = false;
@@ -44,6 +45,10 @@ public class CulvertCLI {
     boolean enableAutoFlush = true;
     try {
       cli = parser.parse(options, args);
+
+      if (cli.hasOption('u')) {
+        metastoreUrl = cli.getOptionValue('u');
+      }
 
       if (cli.hasOption('n')) {
         commitAfterNRows = Integer.parseInt(cli.getOptionValue('n'));
@@ -86,8 +91,8 @@ public class CulvertCLI {
         return;
       }
 
-      Culvert.startCulvert(numParallelStreams, commitAfterNRows, eventsPerSecond, timeout, dynamicPartitioning,
-        streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
+      Culvert.startCulvert(metastoreUrl, numParallelStreams, commitAfterNRows, eventsPerSecond, timeout,
+        dynamicPartitioning, streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
     } catch (ParseException e) {
       System.err.println("Invalid parameter.");
       usage(options);
@@ -98,6 +103,8 @@ public class CulvertCLI {
   }
 
   private static void addOptions(Options options) {
+    options.addOption("u", "metastore-url", true, "remote metastore url." +
+      " default = 'thrift://localhost:9083'");
     options.addOption("n", "commit-after-n-rows", true, "commit transaction " +
       " after every n rows. default = 1_000_000");
     options.addOption("t", "timeout", true, "timeout in milliseconds after which " + "" +
