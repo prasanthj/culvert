@@ -162,10 +162,6 @@ public class Stream implements Runnable {
         .build();
       cols[5] = Column.newBuilder().withName("event_time").withType(Column.Type.TIMESTAMP).build();
       cols[6] = Column.newBuilder().withName("ip_address").withType(Column.Type.STRING_IP_ADDRESS).build();
-
-      // partitioning columns
-//      cols[7] = Column.newBuilder().withName("year").withType(Column.Type.INT_YEAR).build();
-//      cols[8] = Column.newBuilder().withName("month").withType(Column.Type.INT_MONTH).build();
       columns = cols;
     }
   }
@@ -173,7 +169,6 @@ public class Stream implements Runnable {
   @Override
   public void run() {
     Thread.currentThread().setName(name);
-    Thread.setDefaultUncaughtExceptionHandler((t, e) -> close());
     long txnBatchesCommitted = 0;
     try {
       startStreamingConnection();
