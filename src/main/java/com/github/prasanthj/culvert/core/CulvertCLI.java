@@ -34,6 +34,8 @@ public class CulvertCLI {
     CommandLineParser parser = new BasicParser();
     CommandLine cli;
     String metastoreUrl = "thrift://localhost:9083";
+    String db = "default";
+    String table = "culvert";
     int commitAfterNRows = 1_000_000;
     long timeout = 60000;
     boolean dynamicPartitioning = false;
@@ -48,6 +50,14 @@ public class CulvertCLI {
 
       if (cli.hasOption('u')) {
         metastoreUrl = cli.getOptionValue('u');
+      }
+
+      if (cli.hasOption("db")) {
+        db = cli.getOptionValue("db");
+      }
+
+      if (cli.hasOption("table")) {
+        table = cli.getOptionValue("table");
       }
 
       if (cli.hasOption('n')) {
@@ -91,7 +101,7 @@ public class CulvertCLI {
         return;
       }
 
-      Culvert.startCulvert(metastoreUrl, numParallelStreams, commitAfterNRows, eventsPerSecond, timeout,
+      Culvert.startCulvert(metastoreUrl, db, table, numParallelStreams, commitAfterNRows, eventsPerSecond, timeout,
         dynamicPartitioning, streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
     } catch (ParseException e) {
       System.err.println("Invalid parameter.");
@@ -123,6 +133,8 @@ public class CulvertCLI {
       " launching streams. default = 0");
     options.addOption("f", "disable-auto-flush", false,
       "disable auto-flush of open orc files. default = false");
+    options.addOption("db", true, "destination database. default = default");
+    options.addOption("table", true, "destination table. default = culvert");
     options.addOption("h", "help", false, "usage help");
   }
 

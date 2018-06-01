@@ -143,16 +143,18 @@ public class Culvert {
     int streamLaunchDelayMs = 0;
     boolean enableAutoFlush = true;
     String metastoreUrl = "thrift://localhost:9083";
-    startCulvert(metastoreUrl, numParallelStreams, commitAfterNRows, eventsPerSecond, timeout, dynamicPartitioning,
-      streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
+    String db = "default";
+    String table = "culvert";
+    startCulvert(metastoreUrl, db, table, numParallelStreams, commitAfterNRows, eventsPerSecond, timeout,
+      dynamicPartitioning, streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
   }
 
-  static void startCulvert(final String metastoreUrl, final int numParallelStreams,
-    final int commitAfterNRows, final int eventsPerSecond,
+  static void startCulvert(final String metastoreUrl, final String db, final String table,
+    final int numParallelStreams, final int commitAfterNRows, final int eventsPerSecond,
     final long timeout, final boolean dynamicPartitioning, final boolean streamingOptimizations,
     final int transactionBatchSize, final long streamLaunchDelayMs, final boolean enableAutoFlush) {
-    Culvert culvert = buildCulvert(metastoreUrl, numParallelStreams, commitAfterNRows, eventsPerSecond, timeout,
-      dynamicPartitioning, streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
+    Culvert culvert = buildCulvert(metastoreUrl, db, table, numParallelStreams, commitAfterNRows, eventsPerSecond,
+      timeout, dynamicPartitioning, streamingOptimizations, transactionBatchSize, streamLaunchDelayMs, enableAutoFlush);
     CountDownLatch countDownLatch = new CountDownLatch(culvert.getStreams().size());
     culvert.run(countDownLatch);
     try {
@@ -163,15 +165,15 @@ public class Culvert {
     System.exit(0);
   }
 
-  private static Culvert buildCulvert(final String metastoreUrl, final int numParallelStreams,
-    final int commitAfterNRows,
-    final int eventsPerSecond,
+  private static Culvert buildCulvert(final String metastoreUrl, final String db, final String table,
+    final int numParallelStreams, final int commitAfterNRows, final int eventsPerSecond,
     final long timeout, final boolean dynamicPartitioning, final boolean streamingOptimizations,
     final int transactionBatchSize, final long streamLaunchDelayMs, final boolean enableAutoFlush) {
     Culvert.CulvertBuilder culvertBuilder = Culvert.newBuilder();
     for (int i = 0; i < numParallelStreams; i++) {
-      HiveStreamingConnection.Builder connection = getStreamingConnection(metastoreUrl, Arrays.asList("2018", "" + i),
-        dynamicPartitioning, streamingOptimizations, transactionBatchSize, enableAutoFlush);
+      HiveStreamingConnection.Builder connection = getStreamingConnection(metastoreUrl, db, table,
+        Arrays.asList("2018", "" + i), dynamicPartitioning, streamingOptimizations, transactionBatchSize,
+        enableAutoFlush);
       Stream stream = Stream.newBuilder()
         .withName("stream-" + i)
         .withCommitAfterRows(commitAfterNRows)
@@ -202,20 +204,18 @@ public class Culvert {
   // stored as orc
   // tblproperties("transactional"="true");
   private static HiveStreamingConnection.Builder getStreamingConnection(final String metastoreUrl,
-    final List<String> staticPartitions,
+    final String db, final String table, final List<String> staticPartitions,
     final boolean dynamicPartitioning, final boolean streamingOptimizations, final int transactionBatchSize,
     final boolean enableAutoFlush) {
     StrictDelimitedInputWriter writer = StrictDelimitedInputWriter.newBuilder()
       .withFieldDelimiter(',')
       .build();
-    final String dbName = "default";
-    final String tableName = "culvert";
     HiveConf conf = new HiveConf();
     conf.set(MetastoreConf.ConfVars.THRIFT_URIS.getHiveName(), metastoreUrl);
     conf.setBoolVar(HiveConf.ConfVars.HIVE_STREAMING_AUTO_FLUSH_ENABLED, enableAutoFlush);
     return HiveStreamingConnection.newBuilder()
-      .withDatabase(dbName)
-      .withTable(tableName)
+      .withDatabase(db)
+      .withTable(table)
       .withStaticPartitionValues(dynamicPartitioning ? null : staticPartitions)
       .withRecordWriter(writer)
       .withStreamingOptimizations(streamingOptimizations)
