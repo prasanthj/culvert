@@ -48,7 +48,7 @@ public class Column {
   private static List<String> UUIDS = new ArrayList<>();
   private static List<String> TIMESTAMPS = new ArrayList<>();
   private static List<String> IPADDRESSES = new ArrayList<>();
-  private static List<Integer> YEARS = new ArrayList<Integer>();
+  private static List<Integer> YEARS = new ArrayList<>();
   private static List<Integer> MONTHS = new ArrayList<>();
   static {
     random = new Random(123);
@@ -113,7 +113,7 @@ public class Column {
         return faker.name().fullName();
       case STRING_DICT:
         if (dictionary != null) {
-          int randIdx = random.nextInt(SIZE);
+          int randIdx = random.nextInt(dictionary.length);
           return dictionary[randIdx];
         }
         // if dictionary unspecified use colors
