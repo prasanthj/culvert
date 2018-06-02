@@ -42,22 +42,32 @@ public class Column {
   private String name;
   private Type type;
   private Object[] dictionary;
-  private Faker faker;
-  private Random random;
-  private static List<String> UUIDs = new ArrayList<>();
-
+  private static Faker faker;
+  private static Random random;
+  private static int SIZE = 1_000_000;
+  private static List<String> UUIDS = new ArrayList<>();
+  private static List<String> TIMESTAMPS = new ArrayList<>();
+  private static List<String> IPADDRESSES = new ArrayList<>();
+  private static List<Integer> YEARS = new ArrayList<Integer>();
+  private static List<Integer> MONTHS = new ArrayList<>();
   static {
-    for (int i = 0; i < 1_000_000; i++) {
-      UUIDs.add(UUID.randomUUID().toString());
+    random = new Random(123);
+    faker = new Faker(random);
+    System.out.print("Generating " + SIZE + " fake data..");
+    for (int i = 0; i < SIZE; i++) {
+      UUIDS.add(UUID.randomUUID().toString());
+      TIMESTAMPS.add(faker.date().birthday().toInstant().toString());
+      IPADDRESSES.add(faker.internet().ipV4Address());
+      YEARS.add(2000 + (faker.date().birthday().getYear() % 50));
+      MONTHS.add(faker.date().birthday().getMonth() % 30); // 50 * 30 partitions max
     }
+    System.out.println("Completed.");
   }
 
   private Column(String name, Type type, Object[] dictionary) {
     this.name = name;
     this.type = type;
     this.dictionary = dictionary;
-    this.random = new Random(123);
-    this.faker = new Faker(random);
   }
 
   public static class ColumnBuilder {
@@ -98,24 +108,24 @@ public class Column {
       case DOUBLE:
         return random.nextDouble();
       case TIMESTAMP:
-        return faker.date().birthday().toInstant().toString();
+        return TIMESTAMPS.get(random.nextInt(SIZE));
       case STRING:
         return faker.name().fullName();
       case STRING_DICT:
         if (dictionary != null) {
-          int randIdx = random.nextInt(dictionary.length);
+          int randIdx = random.nextInt(SIZE);
           return dictionary[randIdx];
         }
         // if dictionary unspecified use colors
         return faker.color().name();
       case STRING_IP_ADDRESS:
-        return faker.internet().ipV4Address();
+        return IPADDRESSES.get(random.nextInt(SIZE));
       case STRING_UUID_DICT:
-        return UUIDs.get(random.nextInt(UUIDs.size()));
+        return UUIDS.get(random.nextInt(SIZE));
       case INT_YEAR:
-        return 2000 + (faker.date().birthday().getYear() % 50);
+        return YEARS.get(random.nextInt(SIZE));
       case INT_MONTH:
-        return faker.date().birthday().getMonth() % 30; // 50 * 30 partitions max
+        return MONTHS.get(random.nextInt(SIZE));
       default:
         return faker.chuckNorris().fact();
     }
