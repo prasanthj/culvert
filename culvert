@@ -3,5 +3,4 @@
 CULVERT_HOME="$PWD"
 CULVERT_CLASSPATH="$CULVERT_HOME/target/*:$CULVERT_HOME/target/lib/*:$CULVERT_HOME/target/classes"
 
-java -cp $CULVERT_CLASSPATH -Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector com
-.github.prasanthj.culvert.core.CulvertCLI "$@"
+java -cp $CULVERT_CLASSPATH -Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector com.github.prasanthj.culvert.core.CulvertCLI "$@"
