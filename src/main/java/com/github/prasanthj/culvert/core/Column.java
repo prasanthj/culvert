@@ -99,7 +99,8 @@ public class Column {
     return new ColumnBuilder();
   }
 
-  public Object getValue() {
+  public Object getValue(final long row) {
+    int rowIdx = (int) (row % SIZE);
     switch (type) {
       case BOOLEAN:
         return random.nextBoolean();
@@ -108,7 +109,7 @@ public class Column {
       case DOUBLE:
         return random.nextDouble();
       case TIMESTAMP:
-        return TIMESTAMPS.get(random.nextInt(SIZE));
+        return TIMESTAMPS.get(rowIdx);
       case STRING:
         return faker.name().fullName();
       case STRING_DICT:
@@ -119,13 +120,13 @@ public class Column {
         // if dictionary unspecified use colors
         return faker.color().name();
       case STRING_IP_ADDRESS:
-        return IPADDRESSES.get(random.nextInt(SIZE));
+        return IPADDRESSES.get(rowIdx);
       case STRING_UUID_DICT:
-        return UUIDS.get(random.nextInt(SIZE));
+        return UUIDS.get(rowIdx);
       case INT_YEAR:
-        return YEARS.get(random.nextInt(SIZE));
+        return YEARS.get(rowIdx);
       case INT_MONTH:
-        return MONTHS.get(random.nextInt(SIZE));
+        return MONTHS.get(rowIdx);
       default:
         return faker.chuckNorris().fact();
     }

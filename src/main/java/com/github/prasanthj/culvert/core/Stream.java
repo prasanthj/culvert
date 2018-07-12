@@ -185,7 +185,7 @@ public class Stream implements Runnable {
       rowsWritten++;
       StringJoiner stringJoiner = new StringJoiner(",");
       for (Column column : columns) {
-        stringJoiner.add(column.getValue().toString());
+        stringJoiner.add(column.getValue(rowsWritten - 1).toString());
       }
       String row = stringJoiner.toString() + ",\n";
       try {
