@@ -114,7 +114,7 @@ public class Column {
         return faker.name().fullName();
       case STRING_DICT:
         if (dictionary != null) {
-          int randIdx = random.nextInt(dictionary.length);
+          int randIdx = (int) (row % dictionary.length);
           return dictionary[randIdx];
         }
         // if dictionary unspecified use colors

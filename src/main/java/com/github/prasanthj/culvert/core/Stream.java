@@ -19,12 +19,12 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.StringJoiner;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.apache.hive.streaming.HiveStreamingConnection;
 import org.apache.hive.streaming.StreamingConnection;
@@ -182,12 +182,8 @@ public class Stream implements Runnable {
       startTimeoutThread();
     }
     while (!isClosed.get() && !Thread.interrupted()) {
+      String row = columns.stream().map(c -> c.getValue(rowsWritten).toString()).collect(Collectors.joining(","));
       rowsWritten++;
-      StringJoiner stringJoiner = new StringJoiner(",");
-      for (Column column : columns) {
-        stringJoiner.add(column.getValue(rowsWritten - 1).toString());
-      }
-      String row = stringJoiner.toString() + ",\n";
       try {
         if (streamingConnection == null) {
           outputStream.write(row.getBytes("UTF-8"));
