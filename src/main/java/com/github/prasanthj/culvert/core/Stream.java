@@ -24,7 +24,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import org.apache.hive.streaming.HiveStreamingConnection;
 import org.apache.hive.streaming.StreamingConnection;
@@ -182,13 +181,16 @@ public class Stream implements Runnable {
       startTimeoutThread();
     }
     while (!isClosed.get() && !Thread.interrupted()) {
-      String row = columns.stream().map(c -> c.getValue(rowsWritten).toString()).collect(Collectors.joining(","));
+      StringBuilder row = new StringBuilder();
+      for (Column column : columns) {
+        row.append(column.getValue(rowsWritten)).append(",");
+      }
       rowsWritten++;
       try {
         if (streamingConnection == null) {
-          outputStream.write(row.getBytes("UTF-8"));
+          outputStream.write(row.toString().getBytes("UTF-8"));
         } else {
-          streamingConnection.write(row.getBytes("UTF-8"));
+          streamingConnection.write(row.toString().getBytes("UTF-8"));
           if (rowsWritten > 0 && (rowsWritten % commitAfterNRows == 0)) {
             streamingConnection.commitTransaction();
             streamingConnection.beginTransaction();
