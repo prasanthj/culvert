@@ -261,4 +261,8 @@ public class Stream implements Runnable {
   public int getCommitAfterNRows() {
     return commitAfterNRows;
   }
+
+  public long getRowsCommitted() {
+    return rowsCommitted;
+  }
 }

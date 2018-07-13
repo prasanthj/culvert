@@ -162,6 +162,13 @@ public class Culvert {
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
+    long totalRowsCommitted = 0;
+    for (Stream stream : culvert.getStreams()) {
+      totalRowsCommitted += stream.getRowsCommitted();
+    }
+    System.out.println("Total rows committed: " + totalRowsCommitted);
+    int timeoutSeconds = (int) TimeUnit.MILLISECONDS.toSeconds(timeout);
+    System.out.println("Throughput: " + (totalRowsCommitted / timeoutSeconds) + " rows/second");
     System.exit(0);
   }
 
