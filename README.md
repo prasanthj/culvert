@@ -2,6 +2,13 @@
 Hive streaming ingest test application
 
 ## Running culvert
+Before running culvert, checkout the project and build it
+```
+git clone https://github.com/prasanthj/culvert.git
+cd culvert
+mvn clean install
+```
+
 Use culvert cli tool
 ```
 ./culvert --help
